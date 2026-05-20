@@ -15,6 +15,7 @@ export default function App() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [flashlightOn, setFlashlightOn] = useState(false);
   const [soundMode, setSoundMode] = useState<'ring' | 'vibrate' | 'silent'>('ring');
+  const [hasBackendSupport, setHasBackendSupport] = useState(true);
 
   // Sync clock time
   useEffect(() => {
@@ -29,8 +30,13 @@ export default function App() {
     return () => clearInterval(clockInterval);
   }, []);
 
-  // 1. Initial State Load from Server (Unbreakable Shield API)
+  // 1. Initial State Load from Server (Unbreakable Shield API with Static Fallback)
   const fetchStateFromServer = async () => {
+    if (!hasBackendSupport) {
+      runStaticFallback();
+      return;
+    }
+
     try {
       const res = await fetch('/api/shield-state');
       if (res.ok) {
@@ -43,9 +49,66 @@ export default function App() {
           setSoundMode(data.soundMode);
         }
         setIsInitialized(true);
+        // Persist locally too
+        localStorage.setItem('zenlock_target', data.dailyTargetMinutes.toString());
+        localStorage.setItem('zenlock_used', data.usedMinutes.toString());
+        localStorage.setItem('zenlock_monitoring', data.isMonitoring.toString());
+        localStorage.setItem('zenlock_flashlight', String(data.flashlightOn));
+        localStorage.setItem('zenlock_sound', data.soundMode);
+        localStorage.setItem('zenlock_last_updated', Date.now().toString());
+        return;
+      } else {
+        throw new Error(`API returned non-ok status: ${res.status}`);
       }
     } catch (e) {
-      console.error("Failed to connect to ZenLock Shield backend:", e);
+      console.warn("Backend API not reachable. Switching to static fallback mode with browser LocalStorage (support for static hosting like Cloudflare, Vercel, or GitHub Pages):", e);
+      setHasBackendSupport(false);
+    }
+
+    runStaticFallback();
+  };
+
+  const runStaticFallback = () => {
+    // Static / Offline client state fallback to avoid infinite spinner on static hosting
+    try {
+      const savedTarget = localStorage.getItem('zenlock_target');
+      const savedUsed = localStorage.getItem('zenlock_used');
+      const savedIsMonitoring = localStorage.getItem('zenlock_monitoring');
+      const savedFlashlight = localStorage.getItem('zenlock_flashlight');
+      const savedSound = localStorage.getItem('zenlock_sound');
+      const savedLastUpdated = localStorage.getItem('zenlock_last_updated');
+
+      let target = savedTarget ? Number(savedTarget) : 120;
+      let used = savedUsed ? Number(savedUsed) : 0;
+      let monitoring = savedIsMonitoring === 'true';
+      let flashlight = savedFlashlight === 'true';
+      let sound: 'ring' | 'vibrate' | 'silent' = (savedSound === 'ring' || savedSound === 'vibrate' || savedSound === 'silent') ? savedSound : 'ring';
+
+      // Recalculate background screen time elapsed if browser tab was closed/hidden during active monitoring
+      if (monitoring && savedLastUpdated) {
+        const lastTime = Number(savedLastUpdated);
+        const elapsedMs = Date.now() - lastTime;
+        if (elapsedMs > 0) {
+          const elapsedMins = elapsedMs / 60000;
+          used = Math.min(target, used + elapsedMins);
+          if (used >= target) {
+            monitoring = false;
+            used = target;
+          }
+        }
+      }
+
+      setDailyTargetMinutes(target);
+      setUsedMinutes(used);
+      setIsMonitoring(monitoring);
+      setFlashlightOn(flashlight);
+      setSoundMode(sound);
+      setIsInitialized(true);
+
+      localStorage.setItem('zenlock_last_updated', Date.now().toString());
+    } catch (storageError) {
+      console.error("Local storage fallback loaded fail:", storageError);
+      setIsInitialized(true);
     }
   };
 
@@ -61,7 +124,7 @@ export default function App() {
     return () => clearInterval(pollInterval);
   }, []);
 
-  // 3. Helper to update state to server
+  // 3. Helper to update state to server (writes instantly to localStorage then issues background broadcast)
   const updateStateOnServer = async (updates: {
     dailyTargetMinutes?: number;
     usedMinutes?: number;
@@ -69,6 +132,33 @@ export default function App() {
     flashlightOn?: boolean;
     soundMode?: 'ring' | 'vibrate' | 'silent';
   }) => {
+    // Sync to state to avoid high-latency render delays
+    if (updates.dailyTargetMinutes !== undefined) {
+      setDailyTargetMinutes(updates.dailyTargetMinutes);
+      localStorage.setItem('zenlock_target', updates.dailyTargetMinutes.toString());
+    }
+    if (updates.usedMinutes !== undefined) {
+      setUsedMinutes(updates.usedMinutes);
+      localStorage.setItem('zenlock_used', updates.usedMinutes.toString());
+    }
+    if (updates.isMonitoring !== undefined) {
+      setIsMonitoring(updates.isMonitoring);
+      localStorage.setItem('zenlock_monitoring', updates.isMonitoring.toString());
+    }
+    if (updates.flashlightOn !== undefined) {
+      setFlashlightOn(updates.flashlightOn);
+      localStorage.setItem('zenlock_flashlight', updates.flashlightOn.toString());
+    }
+    if (updates.soundMode !== undefined) {
+      setSoundMode(updates.soundMode);
+      localStorage.setItem('zenlock_sound', updates.soundMode);
+    }
+    localStorage.setItem('zenlock_last_updated', Date.now().toString());
+
+    if (!hasBackendSupport) {
+      return;
+    }
+
     try {
       const res = await fetch('/api/shield-state', {
         method: 'POST',
@@ -86,33 +176,28 @@ export default function App() {
         }
       }
     } catch (e) {
-      console.error("Failed to push update to ZenLock Shield backend:", e);
+      console.warn("Backend server not reached for update. Preserved inside secure LocalStorage:", e);
     }
   };
 
   const handleTargetChange = (val: number) => {
-    setDailyTargetMinutes(val);
     updateStateOnServer({ dailyTargetMinutes: val });
   };
 
   const handleUsedChange = (val: number) => {
-    setUsedMinutes(val);
     updateStateOnServer({ usedMinutes: val });
   };
 
   const handleToggleMonitoring = () => {
     const nextMonitoring = !isMonitoring;
-    setIsMonitoring(nextMonitoring);
     updateStateOnServer({ isMonitoring: nextMonitoring, usedMinutes });
   };
 
   const handleFlashlightChange = (val: boolean) => {
-    setFlashlightOn(val);
     updateStateOnServer({ flashlightOn: val });
   };
 
   const handleSoundModeChange = (val: 'ring' | 'vibrate' | 'silent') => {
-    setSoundMode(val);
     updateStateOnServer({ soundMode: val });
   };
 
@@ -123,6 +208,11 @@ export default function App() {
     const interval = setInterval(() => {
       setUsedMinutes(prev => {
         const next = prev + (1 / 60);
+        
+        // Write instantly during tick updates
+        localStorage.setItem('zenlock_used', next.toString());
+        localStorage.setItem('zenlock_last_updated', Date.now().toString());
+
         if (next >= dailyTargetMinutes) {
           setIsMonitoring(false);
           // Direct lockdown endpoint sync
