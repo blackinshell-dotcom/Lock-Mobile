@@ -1,0 +1,6 @@
+{
+  "name": "Screentime Target Lock",
+  "description": "Set a daily screentime. Once depleted, the simulator locks down with emergency call capabilities.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
