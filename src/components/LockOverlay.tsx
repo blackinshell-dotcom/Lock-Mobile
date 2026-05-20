@@ -137,16 +137,41 @@ export default function LockOverlay({
           </p>
 
           {/* User Warning Alert Block */}
-          <div className="p-3 text-left rounded-xl bg-red-950/20 border border-red-500/20 max-w-xs mx-auto mt-2 space-y-1.5 shadow-md">
+          <div className="p-3 text-left rounded-xl bg-red-950/20 border border-red-500/20 max-w-xs mx-auto mt-2 space-y-1.5 shadow-sm">
             <p className="text-[10px] text-red-400 leading-normal font-sans flex items-start gap-1.5">
               <span>⚠️</span>
               <span>
-                <strong>Hardware Lockdown Enforced:</strong> You won't be able to exit this screen, swipe home, close the tab, or perform device shutdown/restarts.
+                <strong>Exit Block Active:</strong> Tab refresh, reload, and navigation exit actions on this web browser window are now strictly guarded.
               </span>
             </p>
-            <div className="pt-1.5 border-t border-red-500/10 flex items-center gap-2 text-[8px] uppercase tracking-wider text-red-500 font-bold font-mono">
-              <Power className="w-2.5 h-2.5" />
-              <span>Power Cycle Buttons Disabled</span>
+          </div>
+
+          {/* Unbreakable Native Pairing Guide */}
+          <div className="p-3 bg-white/5 border border-white/5 rounded-2xl max-w-xs mx-auto text-left mt-2.5 space-y-2 relative overflow-hidden">
+            <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.15em] text-[#2bcfc1] font-bold">
+              <ShieldAlert className="w-3.5 h-3.5" />
+              <span>How to make this 100% Unbreakable</span>
+            </div>
+            
+            <p className="text-[9.5px] text-gray-400 leading-relaxed">
+              Due to modern browser security boxes, websites cannot block physical home buttons or phone shutdowns directly. 
+              To achieve a truly unbreakable lock, pair this webpage with your phone's built-in pinning:
+            </p>
+
+            <div className="space-y-2 mt-1">
+              <div className="bg-[#0a0a0a] p-2 rounded-xl border border-white/5">
+                <span className="font-bold text-white text-[9.5px] block mb-0.5">📱 Android App Pinning</span>
+                <p className="text-[9px] text-gray-400 leading-normal">
+                  Go to <strong>Settings → Security → App/Screen Pinning</strong>. Swipe up, tap the browser app icon, and click <strong>"Pin"</strong>. Minimizing the app or swiping away is blocked.
+                </p>
+              </div>
+
+              <div className="bg-[#0a0a0a] p-2 rounded-xl border border-white/5">
+                <span className="font-bold text-white text-[9.5px] block mb-0.5">🍎 iOS Guided Access</span>
+                <p className="text-[9px] text-gray-400 leading-normal">
+                  Go to <strong>Settings → Accessibility → Guided Access</strong>. Open this lock screen and <strong>triple-click your power button</strong>. All exit and swipe gestures are physically locked.
+                </p>
+              </div>
             </div>
           </div>
         </div>

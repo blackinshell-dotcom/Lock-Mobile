@@ -229,6 +229,23 @@ export default function App() {
   // Is phone locked state
   const isLocked = usedMinutes >= dailyTargetMinutes;
 
+  // Prevent browser exit, refresh, or navigation during active lock screen
+  useEffect(() => {
+    if (!isLocked) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // Most modern browsers display their standard system prompt, but we set the returnValue to satisfy spec
+      e.returnValue = "ZenLock strict screen lockdown is active! Leaving this page will break your screen focus period.";
+      return e.returnValue;
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isLocked]);
+
   return (
     <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-4 relative overflow-x-hidden">
       
